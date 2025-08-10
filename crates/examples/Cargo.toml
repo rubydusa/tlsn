@@ -42,6 +42,8 @@ tokio = { workspace = true, features = [
 tokio-util = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+serio = { workspace = true }
+anyhow.workspace = true
 
 [[example]]
 name = "attestation_prove"
@@ -58,3 +60,11 @@ path = "attestation/verify.rs"
 [[example]]
 name = "interactive"
 path = "interactive/interactive.rs"
+
+[[example]]
+name = "prove_present_izk"
+path = "attestation/prove_present_izk.rs"
+
+[[example]]
+name = "verify_present_izk"
+path = "attestation/verify_present_izk.rs"

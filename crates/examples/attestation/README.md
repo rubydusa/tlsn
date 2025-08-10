@@ -109,3 +109,25 @@ cargo run --release --example attestation_present -- authenticated
 # verify
 cargo run --release --example attestation_verify -- authenticated
 ```
+
+## Presentation IZK
+
+This example demonstrates interactive zero-knowledge presentation verification, where a prover sends a presentation to a verifier over a direct TCP connection for interactive general purpose zk over committed data
+
+**Overview**: The prover loads a saved presentation file and sends it to a verifier for immediate verification, establishing a direct communication channel between both parties.
+
+### Instructions
+
+1. First create a presentation file by following the steps above (notarize and present).
+
+2. Start the verifier (in one terminal):
+```shell
+cargo run --release --example verify_present_izk
+```
+
+3. Start the prover with a presentation file (in another terminal):
+```shell
+cargo run --release --example prove_present_izk -- --file example-json.presentation.tlsn
+```
+
+The verifier will listen for connections and the prover will connect and send the presentation for verification.
