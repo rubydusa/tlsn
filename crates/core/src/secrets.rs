@@ -12,7 +12,8 @@ pub struct Secrets {
     pub(crate) server_cert_opening: ServerCertOpening,
     pub(crate) transcript: Transcript,
     pub(crate) transcript_commitments: Vec<TranscriptCommitment>,
-    pub(crate) transcript_commitment_secrets: Vec<TranscriptSecret>,
+    #[allow(missing_docs)]
+    pub transcript_commitment_secrets: Vec<TranscriptSecret>,
 }
 
 opaque_debug::implement!(Secrets);

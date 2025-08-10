@@ -240,7 +240,7 @@ impl Body {
     }
 
     /// Returns the transcript commitments.
-    pub(crate) fn transcript_commitments(&self) -> impl Iterator<Item = &TranscriptCommitment> {
+    pub fn transcript_commitments(&self) -> impl Iterator<Item = &TranscriptCommitment> {
         self.transcript_commitments.iter().map(|field| &field.data)
     }
 }

@@ -16,7 +16,7 @@ use notary_client::{Accepted, NotarizationRequest, NotaryClient};
 use tls_core::verify::WebPkiVerifier;
 use tls_server_fixture::{CA_CERT_DER, SERVER_DOMAIN};
 use tlsn_common::config::ProtocolConfig;
-use tlsn_core::{request::RequestConfig, transcript::TranscriptCommitConfig, CryptoProvider};
+use tlsn_core::{request::RequestConfig, transcript::{Direction, TranscriptCommitConfig, TranscriptCommitmentKind}, CryptoProvider, hash::HashAlgId};
 use tlsn_examples::ExampleType;
 use tlsn_formats::http::{DefaultHttpCommitter, HttpCommit, HttpTranscript};
 use tlsn_prover::{Prover, ProverConfig, TlsConfig};
@@ -203,6 +203,8 @@ async fn notarize(
     // Commit to the transcript.
     let mut builder = TranscriptCommitConfig::builder(prover.transcript());
 
+    // Add hash commitment to the entire received transcript.
+    builder.commit_with_kind(&(0..prover.transcript().received().len()), Direction::Received, TranscriptCommitmentKind::Hash { alg: HashAlgId::SHA256 })?;
     // This commits to various parts of the transcript separately (e.g. request
     // headers, response headers, response body and more). See https://docs.tlsnotary.org//protocol/commit_strategy.html
     // for other strategies that can be used to generate commitments.

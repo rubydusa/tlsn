@@ -30,6 +30,7 @@ hex = { workspace = true }
 hyper = { workspace = true, features = ["client", "http1"] }
 hyper-util = { workspace = true, features = ["full"] }
 k256 = { workspace = true, features = ["ecdsa"] }
+serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = [
   "rt",
@@ -44,6 +45,14 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 serio = { workspace = true }
 anyhow.workspace = true
+mpz-circuits = { workspace = true }
+mpz-zk = { workspace = true}
+mpz-ot = { workspace = true }
+mpz-core = { workspace = true }
+mpz-hash = { workspace = true }
+mpz-memory-core = { workspace = true }
+mpz-vm-core = { workspace = true }
+rand = { workspace = true }
 
 [[example]]
 name = "attestation_prove"

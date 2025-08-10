@@ -1,5 +1,7 @@
 use std::fmt;
 
+pub mod izk_common;
+
 // Maximum number of bytes that can be sent from prover to server.
 pub const MAX_SENT_DATA: usize = 1 << 12;
 // Maximum number of bytes that can be received by prover from server.
