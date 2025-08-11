@@ -4,8 +4,10 @@ use mpz_memory_core::{MemoryExt, ViewExt};
 use serio::stream::IoStreamExt;
 use tlsn_common::{context::build_mt_context, mux::attach_mux, Role};
 use futures::{AsyncRead, AsyncWrite};
-use tlsn_core::transcript::TranscriptCommitment;
-use tlsn_core::{presentation::Presentation, CryptoProvider};
+use tlsn_core::{
+    presentation::Presentation,
+    transcript::TranscriptCommitment,
+};
 use tokio::net::TcpListener;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use mpz_zk::Verifier;
@@ -24,6 +26,7 @@ use mpz_vm_core::{
 };
 use serio::sink::SinkExt;
 use tlsn_examples::izk_common::{self, ProofRequest, dummy_circuit};
+use tls_server_fixture::CA_CERT_DER;
 
 const ADDRESS: &str = "127.0.0.1:6142";
 
@@ -59,9 +62,9 @@ async fn verifier_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(socke
     let mut ctx = mux_fut.poll_with(mt.new_context()).await?;
 
     let presentation: Presentation = mux_fut.poll_with(ctx.io_mut().expect_next()).await?;
-    // println!("Presentation: {:?}", presentation);
+    let crypto_provider = izk_common::permissive_crypto_provider();
 
-    let presentation_output = presentation.verify(&CryptoProvider::default())?;
+    let presentation_output = presentation.verify(&crypto_provider)?;
 
     let Some(transcript_proof) = presentation_output.transcript else {
         bail!("No transcript proof found");
@@ -94,6 +97,7 @@ async fn verifier_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(socke
         .unwrap();
 
     verifier.mark_blind(inputs_mem).unwrap();
+    verifier.commit(inputs_mem).unwrap();
     let mut circuit_result_fut = verifier.decode(circuit_result_mem).unwrap();
     let mut hash_fut = izk_common::hash(&mut verifier, None, inputs_mem)?;
 

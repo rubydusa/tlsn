@@ -127,7 +127,7 @@ cargo run --release --example verify_present_izk
 
 3. Start the prover with a presentation file (in another terminal):
 ```shell
-cargo run --release --example prove_present_izk -- --file example-json.presentation.tlsn
+cargo run --release --example prove_present_izk 
 ```
 
 The verifier will listen for connections and the prover will connect and send the presentation for verification.

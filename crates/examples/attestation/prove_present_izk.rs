@@ -30,6 +30,7 @@ use mpz_vm_core::{
     },
     Call,
 };
+use tokio::time::sleep;
 
 
 const ADDRESS: &str = "127.0.0.1:6142";
@@ -87,7 +88,8 @@ async fn prover_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(socket:
     let mut mt = build_mt_context(mux_ctrl.clone());
     let mut ctx = mux_fut.poll_with(mt.new_context()).await?;
 
-    let presentation_output = presentation.clone().verify(&CryptoProvider::default())?;
+    let crypto_provider = izk_common::permissive_crypto_provider();
+    let presentation_output = presentation.clone().verify(&crypto_provider)?;
 
     mux_fut.poll_with(ctx.io_mut().send(presentation)).await?;
     // mux_fut.poll_with(tokio::time::sleep(std::time::Duration::from_millis(1000))).await;
@@ -130,6 +132,7 @@ async fn prover_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(socket:
 
     prover.mark_private(inputs_mem).unwrap();
     prover.assign(inputs_mem, inputs.to_owned()).unwrap();
+    prover.commit(inputs_mem).unwrap();
 
     let mut circuit_result_fut = prover.decode(circuit_result_mem).unwrap();
     let mut hash_fut = izk_common::hash(&mut prover, Some(commitment_secret.blinder.clone()), inputs_mem)?;
@@ -144,6 +147,19 @@ async fn prover_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(socket:
 
     println!("Circuit result: {:?}", circuit_result);
     println!("Hash result: {:?}", hash_result);
+    println!("Original hash: {:?}", hash);
+
+    // Poll mux_fut with a tokio async sleep to demonstrate async polling
+
+    // Sleep for 1 second asynchronously and poll with mux_fut
+    mux_fut
+        .poll_with(async {
+            sleep(Duration::from_secs(5)).await;
+            Ok::<_, anyhow::Error>(())
+        })
+        .await
+        .unwrap();
+
 
     Ok(())
 }
