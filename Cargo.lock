@@ -6504,6 +6504,7 @@ dependencies = [
  "hyper-util",
  "k256",
  "mpz-circuits",
+ "mpz-common",
  "mpz-core",
  "mpz-hash",
  "mpz-memory-core",

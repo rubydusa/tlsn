@@ -46,6 +46,7 @@ tracing-subscriber = { workspace = true }
 serio = { workspace = true }
 anyhow.workspace = true
 mpz-circuits = { workspace = true }
+mpz-common = { workspace = true }
 mpz-zk = { workspace = true}
 mpz-ot = { workspace = true }
 mpz-core = { workspace = true }
@@ -71,9 +72,9 @@ name = "interactive"
 path = "interactive/interactive.rs"
 
 [[example]]
-name = "prove_present_izk"
-path = "attestation/prove_present_izk.rs"
+name = "prove_present"
+path = "post-proof/prove_present.rs"
 
 [[example]]
-name = "verify_present_izk"
-path = "attestation/verify_present_izk.rs"
+name = "verify_present"
+path = "post-proof/verify_present.rs"
