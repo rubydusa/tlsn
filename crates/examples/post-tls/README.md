@@ -4,6 +4,7 @@ This example demonstrates how to run an interactive zero-knowledge proof using n
 ## Preliminaries 
 This branch comes already with the examples attestations version-controlled in.
 However, if you want to recreate the attestations, follow the [attestation example](../attestation/README.md).
+Make sure to run both `attestation_prove` and `attestation_present`
 
 ## Run
 To run the post-TLS interactive zero-knowledge proof examples, use the following commands from the root of the repository:
