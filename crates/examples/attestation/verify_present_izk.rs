@@ -112,5 +112,7 @@ async fn verifier_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(socke
     println!("Circuit result: {:?}", circuit_result);
     println!("Hash result: {:?}", hash_result);
 
+    mux_ctrl.close();
+
     Ok(())
 }

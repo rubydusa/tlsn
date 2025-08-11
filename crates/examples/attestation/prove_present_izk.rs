@@ -149,17 +149,8 @@ async fn prover_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(socket:
     println!("Hash result: {:?}", hash_result);
     println!("Original hash: {:?}", hash);
 
-    // Poll mux_fut with a tokio async sleep to demonstrate async polling
-
-    // Sleep for 1 second asynchronously and poll with mux_fut
-    mux_fut
-        .poll_with(async {
-            sleep(Duration::from_secs(5)).await;
-            Ok::<_, anyhow::Error>(())
-        })
-        .await
-        .unwrap();
-
+    // wait until verifier closes the connection
+    mux_fut.await?;
 
     Ok(())
 }
