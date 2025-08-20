@@ -78,3 +78,11 @@ path = "post-tls/prove_present.rs"
 [[example]]
 name = "verify-post-tls"
 path = "post-tls/verify_present.rs"
+
+[[example]]
+name = "interactive-prove"
+path = "interactive-noir/prove.rs"
+
+[[example]]
+name = "interactive-verify"
+path = "interactive-noir/verify.rs"
