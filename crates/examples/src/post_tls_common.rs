@@ -143,6 +143,10 @@ pub async fn perform_proof(
         }
     };
 
+    if let Some(blinder) = &blinder {
+        println!("blinder: {:?}", blinder.as_bytes());
+    }
+
     let mut circuit_result_fut = vm.decode(circuit_result_mem)?;
     let mut hash_fut = apply_sha256(
         vm.as_mut(), 

@@ -9,7 +9,7 @@ use tlsn_core::{
 use tokio::net::TcpListener;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use serio::sink::SinkExt;
-use tlsn_examples::izk_common::{self, dummy_circuit, perform_proof, ProofRequest, RoleArgs, VerifierRoleArgs};
+use tlsn_examples::post_tls_common::{dummy_circuit, perform_proof, permissive_crypto_provider, ProofRequest, RoleArgs, VerifierRoleArgs};
 
 const ADDRESS: &str = "127.0.0.1:6142";
 
@@ -34,7 +34,7 @@ async fn verifier_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(socke
     let mut ctx = mux_fut.poll_with(mt.new_context()).await?;
 
     // get the presentation and verify it
-    let crypto_provider = izk_common::permissive_crypto_provider();
+    let crypto_provider = permissive_crypto_provider();
     let presentation: Presentation = mux_fut.poll_with(ctx.io_mut().expect_next()).await?;
     let presentation_output = presentation.verify(&crypto_provider)?;
 

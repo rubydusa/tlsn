@@ -7,7 +7,7 @@ use futures::{AsyncRead, AsyncWrite};
 use serio::{sink::SinkExt, stream::IoStreamExt};
 use tokio::net::TcpStream;
 use tokio_util::compat::TokioAsyncReadCompatExt;
-use tlsn_examples::izk_common::{self, ProofRequest, ProverRoleArgs, RoleArgs};
+use tlsn_examples::post_tls_common::{ProofRequest, ProverRoleArgs, RoleArgs, perform_proof, permissive_crypto_provider};
 
 const ADDRESS: &str = "127.0.0.1:6142";
 
@@ -20,6 +20,9 @@ struct Args {
     /// Path to the saved secrets file
     #[arg(short, long, default_value = "example-json.secrets.tlsn")]
     secrets_file: PathBuf,
+    /// Path to save the sha256 input file
+    #[arg(long, default_value = "sha256_preimage.json")]
+    sha256_preimage_dest: PathBuf,
 }
 
 fn prepare_proof(
@@ -73,28 +76,29 @@ async fn main() -> Result<()> {
         }
     };
     println!("✅ found verifier.");
-    prover_task(stream.compat(), presentation, secrets).await?;
+    prover_task(stream.compat(), presentation, secrets, args).await?;
 
     Ok(())
 }
 
-async fn prover_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(socket: S, presentation: Presentation, secrets: Secrets) -> Result<()> {
+async fn prover_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(socket: S, presentation: Presentation, secrets: Secrets, args: Args) -> Result<()> {
     // initialize the mux and context handlers
     let (mut mux_fut, mux_ctrl) = attach_mux(socket, Role::Prover);
     let mut mt = build_mt_context(mux_ctrl.clone());
     let mut ctx = mux_fut.poll_with(mt.new_context()).await?;
 
     // send the presentation to the verifier
-    let crypto_provider = izk_common::permissive_crypto_provider();
+    let crypto_provider = permissive_crypto_provider();
     let presentation_output = presentation.clone().verify(&crypto_provider)?;
     mux_fut.poll_with(ctx.io_mut().send(presentation)).await?;
 
     // receive the proof request from the verifier
     let proof_request: ProofRequest = mux_fut.poll_with(ctx.io_mut().expect_next()).await?;
     let (role_args, hash) = prepare_proof(&presentation_output, &secrets, &proof_request)?;
+    fs::write(args.sha256_preimage_dest, serde_json::to_string(&role_args.inputs)?)?;
     let circuit = proof_request.circuit;
 
-    let result = mux_fut.poll_with(izk_common::perform_proof(
+    let result = mux_fut.poll_with(perform_proof(
         &mut ctx, 
         circuit, 
         RoleArgs::Prover(role_args)
