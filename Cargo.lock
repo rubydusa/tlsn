@@ -6513,6 +6513,7 @@ dependencies = [
  "mpz-zk",
  "notary-client",
  "rand 0.9.1",
+ "rangeset",
  "serde",
  "serde_json",
  "serio",

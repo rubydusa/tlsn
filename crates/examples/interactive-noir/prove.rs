@@ -5,16 +5,18 @@ use hyper::{body::Bytes, Request, StatusCode, Uri};
 use hyper_util::rt::TokioIo;
 use tlsn_core::ProveConfig;
 use tlsn_common::config::ProtocolConfig;
-use tlsn_server_fixture::DEFAULT_FIXTURE_PORT;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
 use tlsn_prover::{state::Committed, Prover, ProverConfig};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tlsn_server_fixture_certs::SERVER_DOMAIN;
+use spansy::{json::{JsonValue}};
+use rangeset::{RangeSet, UnionMut};
 
 const MAX_SENT_DATA: usize = 1 << 12;
 const MAX_RECV_DATA: usize = 1 << 14;
 const MPC_CONNECTION_ADDRESS: &str = "127.0.0.1:6142";
+const DEFAULT_FIXTURE_PORT: u16 = 4000;
 
 // #[derive(Parser, Debug)]
 // #[command(version, about, long_about = None)]
@@ -32,12 +34,9 @@ async fn main() -> Result<()> {
 
     // We use SERVER_DOMAIN here to make sure it matches the domain in the test
     // server's certificate.
-    let uri = format!("https://{SERVER_DOMAIN}:{server_port}/formats/html");
+    let uri = format!("https://{SERVER_DOMAIN}:{server_port}/formats/json");
     let server_ip: IpAddr = server_host.parse().expect("Invalid IP address");
     let server_addr = SocketAddr::from((server_ip, server_port));
-
-    println!("uri: {uri}");
-    println!("server_addr: {server_addr}");
 
     let stream = loop {
         match TcpStream::connect(MPC_CONNECTION_ADDRESS).await {
@@ -69,6 +68,19 @@ async fn prover_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     // Reveal the DNS name.
     builder.server_identity();
 
+    let response = spansy::http::parse_response(prover.transcript().received()).unwrap();
+    let body_content = response.body.as_ref().map(|b| &b.content).unwrap();
+    let range_set = match body_content {
+        spansy::http::BodyContent::Json(obj) => {
+            json_non_content_range_set(obj)
+        }
+        _ => panic!("non json-object body")
+    };
+
+    // print the full received data
+    println!("{}", String::from_utf8_lossy(prover.transcript().received()));
+
+    builder.reveal_recv(&range_set).unwrap();
     let config = builder.build().unwrap();
     prover.prove(&config).await.unwrap();
     Ok(prover.close().await.unwrap())
@@ -127,4 +139,26 @@ async fn mpc_tls_prover<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     assert!(response.status() == StatusCode::OK);
     // Create proof for the Verifier.
     Ok(prover_task.await.unwrap().unwrap())
+}
+
+fn json_non_content_range_set(json: &JsonValue) -> RangeSet<usize> {
+    let mut range_set = RangeSet::new(&[]);
+    let mut stack = vec![json];
+    while let Some(item) = stack.pop() {
+        match item {
+            JsonValue::Object(obj) => {
+                range_set.union_mut(&obj.without_pairs());
+                stack.extend(obj.elems.iter().map(|kv| {
+                    range_set.union_mut(&kv.without_value());
+                    &kv.value
+                }));
+            }
+            JsonValue::Array(arr) => {
+                range_set.union_mut(&arr.without_values());
+                stack.extend(arr.elems.iter());
+            }
+            _ => {}
+        }
+    }
+    range_set
 }

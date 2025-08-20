@@ -1,9 +1,8 @@
-use std::time::Duration;
 use anyhow::Result;
 use tlsn_core::{VerifierOutput, VerifyConfig};
 use tlsn_verifier::{Verifier, VerifierConfig};
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpListener;
 use tokio_util::compat::{TokioAsyncReadCompatExt};
 use tlsn_common::config::ProtocolConfigValidator;
 
@@ -24,7 +23,10 @@ async fn main() -> Result<()> {
     
     let (stream, _) = listener.accept().await?;
     println!("✅ Prover connected.");
-    verifier_task(stream).await?;
+    let verifier_output = verifier_task(stream).await?;
+
+    let result = bytes_to_redacted_string(verifier_output.transcript.unwrap().received_unsafe());
+    println!("{}", result);
 
     Ok(())
 }
@@ -51,4 +53,10 @@ async fn verifier_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
         .verify(socket.compat(), &VerifyConfig::default())
         .await
         .unwrap())
+}
+/// Render redacted bytes as `🙈`.
+fn bytes_to_redacted_string(bytes: &[u8]) -> String {
+    String::from_utf8(bytes.to_vec())
+        .unwrap()
+        .replace('\0', "🙈")
 }
