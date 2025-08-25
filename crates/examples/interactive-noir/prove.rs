@@ -3,7 +3,7 @@ use anyhow::Result;
 use http_body_util::Empty;
 use hyper::{body::Bytes, Request, StatusCode, Uri};
 use hyper_util::rt::TokioIo;
-use tlsn_core::ProveConfig;
+use tlsn_core::{hash::HashAlgId, transcript::{Direction, TranscriptCommitConfig, TranscriptCommitConfigBuilder, TranscriptCommitmentKind, TranscriptSecret}, ProveConfig};
 use tlsn_common::config::ProtocolConfig;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
@@ -80,9 +80,37 @@ async fn prover_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     // print the full received data
     println!("{}", String::from_utf8_lossy(prover.transcript().received()));
 
+    // reveal the non-values in the json response
     builder.reveal_recv(&range_set).unwrap();
+
+    // hash the entire response
+    // TODO: compute range interactively based on the json response?
+    let mut commitment_builder = TranscriptCommitConfig::builder(prover.transcript());
+    commitment_builder.commit_with_kind(
+        &(0..prover.transcript().received().len()), 
+        Direction::Received, 
+        TranscriptCommitmentKind::Hash { alg: HashAlgId::SHA256 }
+    ).unwrap();
+    let transcript_commit = commitment_builder.build().unwrap();
+    builder.transcript_commit(transcript_commit);
     let config = builder.build().unwrap();
-    prover.prove(&config).await.unwrap();
+
+    // get the blinder
+    let prover_output = prover.prove(&config).await.unwrap();
+    let TranscriptSecret::Hash(hash_secret) = &prover_output.transcript_secrets[0] else {
+        panic!("first transcript secret is not a hash");
+    };
+    let blinder = &hash_secret.blinder;
+
+    let needle = b"Computer Science";
+    println!("------------------Input for Noir circuit------------------");
+    println!("blinder: {:?}", blinder.as_bytes());
+    println!("input: {:?}", prover.transcript().received());
+    println!("input length: {}", prover.transcript().received().len());
+    println!("needle: {:?}", needle);
+    println!("needle length: {}", needle.len());
+    println!("----------------------------------------------------------");
+
     Ok(prover.close().await.unwrap())
 }
 

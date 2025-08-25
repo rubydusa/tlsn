@@ -25,6 +25,8 @@ async fn main() -> Result<()> {
     println!("✅ Prover connected.");
     let verifier_output = verifier_task(stream).await?;
 
+    println!("transcript commitments: {:?}", verifier_output.transcript_commitments);
+
     let result = bytes_to_redacted_string(verifier_output.transcript.unwrap().received_unsafe());
     println!("{}", result);
 
