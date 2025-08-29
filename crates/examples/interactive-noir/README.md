@@ -18,7 +18,7 @@ SERVER_PORT=4000 cargo run --release --example interactive-prove
 
 3. **Run the verifier** (in any order):
 ```shell
-SERVER_PORT=4000 cargo run --release --example interactive-verify
+cargo run --release --example interactive-verify
 ```
 
 ### Expected Output
