@@ -1,0 +1,3 @@
+[submodule "crates/examples/tlsn-noir-poc"]
+	path = crates/examples/tlsn-noir-poc
+	url = https://github.com/rubydusa/tlsn-noir-poc.git
