@@ -1,3 +1,6 @@
 [submodule "crates/examples/tlsn-noir-poc"]
 	path = crates/examples/tlsn-noir-poc
 	url = https://github.com/rubydusa/tlsn-noir-poc.git
+[submodule "crates/examples/bb-service"]
+	path = crates/examples/bb-service
+	url = https://github.com/OpacityLabs/bb-service.git
