@@ -27,7 +27,7 @@ use tlsn_common::{
     config::ProtocolConfig,
     context::build_mt_context,
     encoding,
-    mux::attach_mux,
+    mux::{attach_mux, MuxFuture},
     tag::verify_tags,
     transcript::{decode_transcript, verify_transcript, Record, TlsTranscript},
     zk_aes_ctr::ZkAesCtr,
@@ -42,6 +42,7 @@ use tlsn_core::{
 };
 use tlsn_deap::Deap;
 use tokio::sync::Mutex;
+use uid_mux::yamux::YamuxCtrl;
 use web_time::{SystemTime, UNIX_EPOCH};
 
 use tracing::{debug, info, info_span, instrument, Span};
@@ -529,6 +530,16 @@ impl Verifier<state::Committed> {
         }
 
         Ok(())
+    }
+
+    /// Consumes the verifier and returns the connection handles.
+    #[instrument(parent = &self.span, level = "info", skip_all, err)]
+    pub async fn get_connection(self) -> Result<(YamuxCtrl, MuxFuture, Context), VerifierError> {
+        let state::Committed {
+            mux_ctrl, mux_fut, ctx, ..
+        } = self.state;
+
+        Ok((mux_ctrl, mux_fut, ctx))
     }
 }
 

@@ -3,6 +3,7 @@ use anyhow::Result;
 use http_body_util::Empty;
 use hyper::{body::Bytes, Request, StatusCode, Uri};
 use hyper_util::rt::TokioIo;
+use serio::SinkExt;
 use tlsn_core::{hash::HashAlgId, transcript::{Direction, TranscriptCommitConfig, TranscriptCommitConfigBuilder, TranscriptCommitmentKind, TranscriptSecret}, ProveConfig};
 use tlsn_common::config::ProtocolConfig;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -114,7 +115,7 @@ async fn prover_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     println!("needle length: {}", needle.len());
     println!("----------------------------------------------------------");
     let transcript_data = prover.transcript().received().to_owned();
-    prover.close().await.unwrap();
+    let (mux_ctrl, mut mux_fut, mut ctx) = prover.get_connection().await.unwrap();
 
     // Load circuit definition from JSON file, using environment variables to get the path to the examples directory
     let examples_dir = std::env::var("CARGO_MANIFEST_DIR")
@@ -129,9 +130,16 @@ async fn prover_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     let proof_data = generate_proof_with_bb_service(circuit, input_map).await?;
     
     // Save proof to disk
-    save_proof_to_disk(&proof_data, "proof_output.json").await?;
-    
-    println!("✅ Proof generated and saved to proof_output.json");
+    // save_proof_to_disk(&proof_data, "proof_output.json").await?;
+    // println!("✅ Proof generated and saved to proof_output.json");
+
+    mux_fut.poll_with(ctx.io_mut().send(proof_data)).await?;
+
+    // Wait for the verifier to correctly close the connection.
+    if !mux_fut.is_complete() {
+        mux_ctrl.close();
+        mux_fut.await?;
+    }
     Ok(())
 }
 
@@ -284,18 +292,18 @@ async fn generate_proof_with_bb_service(circuit: CompiledCircuit, input: InputMa
     Ok(proof_data)
 }
 
-async fn save_proof_to_disk(proof_data: &tlsn_examples::bb_service::ProofData, filename: &str) -> Result<()> {
-    let proof_json = serde_json::to_string_pretty(proof_data)
-        .map_err(|e| anyhow::anyhow!("Failed to serialize proof data: {}", e))?;
+// async fn save_proof_to_disk(proof_data: &tlsn_examples::bb_service::ProofData, filename: &str) -> Result<()> {
+//     let proof_json = serde_json::to_string_pretty(proof_data)
+//         .map_err(|e| anyhow::anyhow!("Failed to serialize proof data: {}", e))?;
 
-    // Print the full path where the proof will be saved, relative to the current working directory
-    let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-    let full_path = cwd.join(filename);
-    println!("Saving proof to: {}", full_path.display());
+//     // Print the full path where the proof will be saved, relative to the current working directory
+//     let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+//     let full_path = cwd.join(filename);
+//     println!("Saving proof to: {}", full_path.display());
     
-    fs::write(filename, proof_json)
-        .map_err(|e| anyhow::anyhow!("Failed to write proof to file {}: {}", filename, e))?;
+//     fs::write(filename, proof_json)
+//         .map_err(|e| anyhow::anyhow!("Failed to write proof to file {}: {}", filename, e))?;
         
-    println!("💾 Proof saved to {}", filename);
-    Ok(())
-}
+//     println!("💾 Proof saved to {}", filename);
+//     Ok(())
+// }

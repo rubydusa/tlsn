@@ -23,6 +23,7 @@ use futures::{AsyncRead, AsyncWrite, TryFutureExt};
 use mpc_tls::{LeaderCtrl, MpcTlsLeader, SessionKeys};
 use rand::Rng;
 use serio::{stream::IoStreamExt, SinkExt};
+use uid_mux::yamux::YamuxCtrl;
 use std::sync::Arc;
 use tls_client::{ClientConnection, ServerName as TlsServerName};
 use tls_client_async::{bind_client, TlsConnection};
@@ -31,7 +32,7 @@ use tlsn_common::{
     commit::{commit_records, hash::prove_hash},
     context::build_mt_context,
     encoding,
-    mux::attach_mux,
+    mux::{attach_mux, MuxFuture},
     tag::verify_tags,
     transcript::{decode_transcript, Record, TlsTranscript},
     zk_aes_ctr::ZkAesCtr,
@@ -565,6 +566,16 @@ impl Prover<state::Committed> {
         }
 
         Ok(())
+    }
+
+    /// Consumes the prover and returns the connection handles.
+    #[instrument(parent = &self.span, level = "info", skip_all, err)]
+    pub async fn get_connection(self) -> Result<(YamuxCtrl, MuxFuture, Context), ProverError> {
+        let state::Committed {
+            mux_ctrl, mux_fut, ctx, ..
+        } = self.state;
+
+        Ok((mux_ctrl, mux_fut, ctx))
     }
 }
 

@@ -1,14 +1,17 @@
 use anyhow::Result;
-use tlsn_core::{VerifierOutput, VerifyConfig};
+use tlsn_core::VerifyConfig;
+use tlsn_verifier::state::Committed;
 use tlsn_verifier::{Verifier, VerifierConfig};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 use tokio_util::compat::{TokioAsyncReadCompatExt};
 use tlsn_common::config::ProtocolConfigValidator;
+use serio::stream::IoStreamExt;
 
 const MAX_SENT_DATA: usize = 1 << 12;
 const MAX_RECV_DATA: usize = 1 << 14;
 const MPC_CONNECTION_ADDRESS: &str = "127.0.0.1:6142";
+const BB_SERVICE_ENDPOINT: &str = "http://localhost:3000";
 
 // #[derive(Parser, Debug)]
 // #[command(version, about, long_about = None)]
@@ -23,19 +26,27 @@ async fn main() -> Result<()> {
     
     let (stream, _) = listener.accept().await?;
     println!("✅ Prover connected.");
-    let verifier_output = verifier_task(stream).await?;
+    let mut verifier = verifier_task(stream).await?;
+
+    let verifier_output = verifier.verify(&VerifyConfig::default()).await?;
 
     println!("transcript commitments: {:?}", verifier_output.transcript_commitments);
 
     let result = bytes_to_redacted_string(verifier_output.transcript.unwrap().received_unsafe());
     println!("{}", result);
 
+    // Get connection handles and wait to receive noir proof
+    let (mux_ctrl, mut mux_fut, mut ctx) = verifier.get_connection().await?;
+    let proof_data: tlsn_examples::bb_service::ProofData = mux_fut.poll_with(ctx.io_mut().expect_next()).await?;
+
+    println!("Received proof data: {:?}", proof_data);
+
     Ok(())
 }
 
 async fn verifier_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     socket: S, 
-) -> Result<VerifierOutput> {
+) -> Result<Verifier<Committed>> {
     // Set up Verifier.
     let config_validator = ProtocolConfigValidator::builder()
         .max_sent_data(MAX_SENT_DATA)
@@ -49,13 +60,10 @@ async fn verifier_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
         .crypto_provider(crypto_provider)
         .build()
         .unwrap();
-    let verifier = Verifier::new(verifier_config);
-
-    Ok(verifier
-        .verify(socket.compat(), &VerifyConfig::default())
-        .await
-        .unwrap())
+    // let verifier = Verifier::new(verifier_config);
+    Ok(Verifier::new(verifier_config).setup(socket.compat()).await?.run().await?)
 }
+
 /// Render redacted bytes as `🙈`.
 fn bytes_to_redacted_string(bytes: &[u8]) -> String {
     String::from_utf8(bytes.to_vec())
