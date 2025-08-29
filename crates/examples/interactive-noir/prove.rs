@@ -12,10 +12,13 @@ use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tlsn_server_fixture_certs::SERVER_DOMAIN;
 use spansy::{json::{JsonValue}};
 use rangeset::{RangeSet, UnionMut};
+use std::fs;
+use tlsn_examples::bb_service::{BbServiceClient, CompiledCircuit, InputMap};
 
 const MAX_SENT_DATA: usize = 1 << 12;
 const MAX_RECV_DATA: usize = 1 << 14;
 const MPC_CONNECTION_ADDRESS: &str = "127.0.0.1:6142";
+const BB_SERVICE_ENDPOINT: &str = "http://localhost:3000";
 const DEFAULT_FIXTURE_PORT: u16 = 4000;
 
 // #[derive(Parser, Debug)]
@@ -110,8 +113,26 @@ async fn prover_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     println!("needle: {:?}", needle);
     println!("needle length: {}", needle.len());
     println!("----------------------------------------------------------");
+    let transcript_data = prover.transcript().received().to_owned();
+    prover.close().await.unwrap();
 
-    Ok(prover.close().await.unwrap())
+    // Load circuit definition from JSON file, using environment variables to get the path to the examples directory
+    let examples_dir = std::env::var("CARGO_MANIFEST_DIR")
+        .expect("CARGO_MANIFEST_DIR env var not set");
+    let circuit_path = format!("{}/tlsn-noir-poc/target/zktlsAttestation.json", examples_dir);
+    let circuit = load_circuit_definition(&circuit_path).await?;
+    
+    // Prepare input for the circuit
+    let input_map = prepare_circuit_input(blinder.as_bytes(), &transcript_data, needle)?;
+    
+    // Generate proof using bb-service
+    let proof_data = generate_proof_with_bb_service(circuit, input_map).await?;
+    
+    // Save proof to disk
+    save_proof_to_disk(&proof_data, "proof_output.json").await?;
+    
+    println!("✅ Proof generated and saved to proof_output.json");
+    Ok(())
 }
 
 async fn mpc_tls_prover<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
@@ -189,4 +210,92 @@ fn json_non_content_range_set(json: &JsonValue) -> RangeSet<usize> {
         }
     }
     range_set
+}
+
+async fn load_circuit_definition(path: &str) -> Result<CompiledCircuit> {
+    let circuit_content = fs::read_to_string(path)
+        .map_err(|e| anyhow::anyhow!("Failed to read circuit file {}: {}", path, e))?;
+    
+    let circuit_json: serde_json::Value = serde_json::from_str(&circuit_content)
+        .map_err(|e| anyhow::anyhow!("Failed to parse circuit JSON: {}", e))?;
+    
+    // Validate that it contains the essential fields
+    if !circuit_json.is_object() {
+        return Err(anyhow::anyhow!("Circuit JSON must be an object"));
+    }
+    
+    let obj = circuit_json.as_object().unwrap();
+    if !obj.contains_key("bytecode") || !obj.contains_key("abi") {
+        return Err(anyhow::anyhow!("Circuit JSON must contain 'bytecode' and 'abi' fields"));
+    }
+    
+    // Return the entire JSON object as-is
+    Ok(circuit_json)
+}
+
+fn prepare_circuit_input(blinder: &[u8], transcript_data: &[u8], needle: &[u8]) -> Result<InputMap> {
+    let mut input_map = InputMap::new();
+    
+    // Prepare input_and_blinder: combine transcript data with blinder
+    let mut input_and_blinder = Vec::new();
+    input_and_blinder.extend_from_slice(transcript_data);
+    input_and_blinder.extend_from_slice(blinder);
+    
+    // Pad or truncate to expected size (1040 bytes based on the circuit ABI)
+    input_and_blinder.resize(1040, 0u8);
+    
+    // Prepare needle array (128 bytes based on the circuit ABI)
+    let mut needle_array = vec![0u8; 128];
+    let copy_len = std::cmp::min(needle.len(), needle_array.len());
+    needle_array[..copy_len].copy_from_slice(&needle[..copy_len]);
+    
+    // Convert to JSON arrays
+    let input_and_blinder_json: Vec<serde_json::Value> = input_and_blinder
+        .into_iter()
+        .map(|byte| serde_json::Value::Number(serde_json::Number::from(byte)))
+        .collect();
+        
+    let needle_json: Vec<serde_json::Value> = needle_array
+        .into_iter()
+        .map(|byte| serde_json::Value::Number(serde_json::Number::from(byte)))
+        .collect();
+    
+    input_map.insert("input_and_blinder".to_string(), serde_json::Value::Array(input_and_blinder_json));
+    input_map.insert("needle".to_string(), serde_json::Value::Array(needle_json));
+    input_map.insert("input_length".to_string(), serde_json::Value::Number(serde_json::Number::from(transcript_data.len() as u32)));
+    input_map.insert("needle_length".to_string(), serde_json::Value::Number(serde_json::Number::from(needle.len() as u32)));
+    
+    Ok(input_map)
+}
+
+async fn generate_proof_with_bb_service(circuit: CompiledCircuit, input: InputMap) -> Result<tlsn_examples::bb_service::ProofData> {
+    let client = BbServiceClient::new(BB_SERVICE_ENDPOINT.to_string());
+    
+    // Check if bb-service is available
+    if !client.health_check().await.unwrap_or(false) {
+        return Err(anyhow::anyhow!("bb-service is not available at http://127.0.0.1:3000. Please start the service."));
+    }
+    
+    println!("📡 Generating proof using bb-service...");
+    let proof_data = client.generate_proof(circuit, input).await
+        .map_err(|e| anyhow::anyhow!("Failed to generate proof: {}", e))?;
+        
+    println!("✅ Proof generated successfully!");
+    Ok(proof_data)
+}
+
+async fn save_proof_to_disk(proof_data: &tlsn_examples::bb_service::ProofData, filename: &str) -> Result<()> {
+    let proof_json = serde_json::to_string_pretty(proof_data)
+        .map_err(|e| anyhow::anyhow!("Failed to serialize proof data: {}", e))?;
+
+    // Print the full path where the proof will be saved, relative to the current working directory
+    let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let full_path = cwd.join(filename);
+    println!("Saving proof to: {}", full_path.display());
+    
+    fs::write(filename, proof_json)
+        .map_err(|e| anyhow::anyhow!("Failed to write proof to file {}: {}", filename, e))?;
+        
+    println!("💾 Proof saved to {}", filename);
+    Ok(())
 }

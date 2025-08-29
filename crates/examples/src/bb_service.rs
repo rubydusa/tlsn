@@ -13,20 +13,8 @@ pub enum BbServiceError {
     InvalidResponse,
 }
 
-/// Represents a compiled Noir circuit
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CompiledCircuit {
-    pub bytecode: String,
-    pub abi: CircuitAbi,
-    pub debug_symbols: String,
-    pub file_map: HashMap<String, serde_json::Value>,
-}
-
-/// Circuit ABI structure
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CircuitAbi {
-    pub parameters: Vec<serde_json::Value>,
-}
+/// Represents a compiled Noir circuit as arbitrary JSON
+pub type CompiledCircuit = serde_json::Value;
 
 /// Input map for circuit execution
 pub type InputMap = HashMap<String, serde_json::Value>;
@@ -35,6 +23,7 @@ pub type InputMap = HashMap<String, serde_json::Value>;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProofData {
     pub proof: Vec<u8>,
+    #[serde(rename = "publicInputs")]
     pub public_inputs: Vec<serde_json::Value>,
 }
 
@@ -160,7 +149,7 @@ impl BbServiceClient {
     pub async fn health_check(&self) -> Result<bool, BbServiceError> {
         let response = self
             .client
-            .get(&format!("{}/", self.base_url))
+            .get(&format!("{}/health", self.base_url))
             .send()
             .await?;
         
