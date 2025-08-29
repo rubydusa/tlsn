@@ -2,6 +2,7 @@ use std::fmt;
 
 pub mod post_tls_common;
 pub mod interactive_noir_common;
+pub mod bb_service;
 
 // Maximum number of bytes that can be sent from prover to server.
 pub const MAX_SENT_DATA: usize = 1 << 12;

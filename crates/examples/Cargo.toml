@@ -55,6 +55,8 @@ mpz-memory-core = { workspace = true }
 mpz-vm-core = { workspace = true }
 rand = { workspace = true }
 rangeset = { workspace = true }
+reqwest = { version = "0.11", features = ["json"] }
+thiserror = { version = "1.0" }
 
 [[example]]
 name = "attestation_prove"
