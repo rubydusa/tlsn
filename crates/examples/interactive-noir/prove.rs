@@ -13,8 +13,7 @@ use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tlsn_server_fixture_certs::SERVER_DOMAIN;
 use spansy::{json::{JsonValue}};
 use rangeset::{RangeSet, UnionMut};
-use std::fs;
-use tlsn_examples::bb_service::{BbServiceClient, CompiledCircuit, InputMap};
+use tlsn_examples::bb_service::{load_circuit_definition, BbServiceClient, CompiledCircuit, InputMap};
 
 const MAX_SENT_DATA: usize = 1 << 12;
 const MAX_RECV_DATA: usize = 1 << 14;
@@ -123,6 +122,10 @@ async fn prover_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     let circuit_path = format!("{}/tlsn-noir-poc/target/zktlsAttestation.json", examples_dir);
     let circuit = load_circuit_definition(&circuit_path).await?;
     
+    // intentionally change the blinder to test the circuit
+    // let mut blinder = blinder.as_bytes().to_vec();
+    // blinder[0] = 1;
+
     // Prepare input for the circuit
     let input_map = prepare_circuit_input(blinder.as_bytes(), &transcript_data, needle)?;
     
@@ -218,27 +221,6 @@ fn json_non_content_range_set(json: &JsonValue) -> RangeSet<usize> {
         }
     }
     range_set
-}
-
-async fn load_circuit_definition(path: &str) -> Result<CompiledCircuit> {
-    let circuit_content = fs::read_to_string(path)
-        .map_err(|e| anyhow::anyhow!("Failed to read circuit file {}: {}", path, e))?;
-    
-    let circuit_json: serde_json::Value = serde_json::from_str(&circuit_content)
-        .map_err(|e| anyhow::anyhow!("Failed to parse circuit JSON: {}", e))?;
-    
-    // Validate that it contains the essential fields
-    if !circuit_json.is_object() {
-        return Err(anyhow::anyhow!("Circuit JSON must be an object"));
-    }
-    
-    let obj = circuit_json.as_object().unwrap();
-    if !obj.contains_key("bytecode") || !obj.contains_key("abi") {
-        return Err(anyhow::anyhow!("Circuit JSON must contain 'bytecode' and 'abi' fields"));
-    }
-    
-    // Return the entire JSON object as-is
-    Ok(circuit_json)
 }
 
 fn prepare_circuit_input(blinder: &[u8], transcript_data: &[u8], needle: &[u8]) -> Result<InputMap> {

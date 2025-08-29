@@ -1,6 +1,7 @@
 use reqwest::{Client, Error as ReqwestError};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, fs};
+use anyhow::Result;
 
 /// Error types for bb-service operations
 #[derive(Debug, thiserror::Error)]
@@ -155,4 +156,25 @@ impl BbServiceClient {
         
         Ok(response.status().is_success())
     }
+}
+
+pub async fn load_circuit_definition(path: &str) -> Result<CompiledCircuit> {
+    let circuit_content = fs::read_to_string(path)
+        .map_err(|e| anyhow::anyhow!("Failed to read circuit file {}: {}", path, e))?;
+    
+    let circuit_json: serde_json::Value = serde_json::from_str(&circuit_content)
+        .map_err(|e| anyhow::anyhow!("Failed to parse circuit JSON: {}", e))?;
+    
+    // Validate that it contains the essential fields
+    if !circuit_json.is_object() {
+        return Err(anyhow::anyhow!("Circuit JSON must be an object"));
+    }
+    
+    let obj = circuit_json.as_object().unwrap();
+    if !obj.contains_key("bytecode") || !obj.contains_key("abi") {
+        return Err(anyhow::anyhow!("Circuit JSON must contain 'bytecode' and 'abi' fields"));
+    }
+    
+    // Return the entire JSON object as-is
+    Ok(circuit_json)
 }
