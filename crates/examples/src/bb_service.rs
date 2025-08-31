@@ -1,5 +1,6 @@
 use reqwest::{Client, Error as ReqwestError};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::{collections::HashMap, fs};
 use anyhow::Result;
 
@@ -25,7 +26,7 @@ pub type InputMap = HashMap<String, serde_json::Value>;
 pub struct ProofData {
     pub proof: Vec<u8>,
     #[serde(rename = "publicInputs")]
-    pub public_inputs: Vec<serde_json::Value>,
+    pub public_inputs: Vec<u8>,
 }
 
 /// Request structure for proof generation

@@ -106,13 +106,6 @@ async fn prover_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     let blinder = &hash_secret.blinder;
 
     let needle = b"Computer Science";
-    println!("------------------Input for Noir circuit------------------");
-    println!("blinder: {:?}", blinder.as_bytes());
-    println!("input: {:?}", prover.transcript().received());
-    println!("input length: {}", prover.transcript().received().len());
-    println!("needle: {:?}", needle);
-    println!("needle length: {}", needle.len());
-    println!("----------------------------------------------------------");
     let transcript_data = prover.transcript().received().to_owned();
     let (mux_ctrl, mut mux_fut, mut ctx) = prover.get_connection().await.unwrap();
 
@@ -121,20 +114,12 @@ async fn prover_task<S: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
         .expect("CARGO_MANIFEST_DIR env var not set");
     let circuit_path = format!("{}/tlsn-noir-poc/target/zktlsAttestation.json", examples_dir);
     let circuit = load_circuit_definition(&circuit_path).await?;
-    
-    // intentionally change the blinder to test the circuit
-    // let mut blinder = blinder.as_bytes().to_vec();
-    // blinder[0] = 1;
 
     // Prepare input for the circuit
     let input_map = prepare_circuit_input(blinder.as_bytes(), &transcript_data, needle)?;
     
     // Generate proof using bb-service
     let proof_data = generate_proof_with_bb_service(circuit, input_map).await?;
-    
-    // Save proof to disk
-    // save_proof_to_disk(&proof_data, "proof_output.json").await?;
-    // println!("✅ Proof generated and saved to proof_output.json");
 
     mux_fut.poll_with(ctx.io_mut().send(proof_data)).await?;
 
@@ -273,19 +258,3 @@ async fn generate_proof_with_bb_service(circuit: CompiledCircuit, input: InputMa
     println!("✅ Proof generated successfully!");
     Ok(proof_data)
 }
-
-// async fn save_proof_to_disk(proof_data: &tlsn_examples::bb_service::ProofData, filename: &str) -> Result<()> {
-//     let proof_json = serde_json::to_string_pretty(proof_data)
-//         .map_err(|e| anyhow::anyhow!("Failed to serialize proof data: {}", e))?;
-
-//     // Print the full path where the proof will be saved, relative to the current working directory
-//     let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-//     let full_path = cwd.join(filename);
-//     println!("Saving proof to: {}", full_path.display());
-    
-//     fs::write(filename, proof_json)
-//         .map_err(|e| anyhow::anyhow!("Failed to write proof to file {}: {}", filename, e))?;
-        
-//     println!("💾 Proof saved to {}", filename);
-//     Ok(())
-// }
