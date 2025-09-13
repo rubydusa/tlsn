@@ -74,19 +74,19 @@ tlsn-harness-runner = { path = "crates/harness/runner" }
 tlsn-wasm = { path = "crates/wasm" }
 tlsn-verifier = { path = "crates/verifier" }
 
-mpz-circuits = { git = "https://github.com/privacy-scaling-explorations/mpz", rev = "ccc0057" }
-mpz-memory-core = { git = "https://github.com/privacy-scaling-explorations/mpz", rev = "ccc0057" }
-mpz-common = { git = "https://github.com/privacy-scaling-explorations/mpz", rev = "ccc0057" }
-mpz-core = { git = "https://github.com/privacy-scaling-explorations/mpz", rev = "ccc0057" }
-mpz-vm-core = { git = "https://github.com/privacy-scaling-explorations/mpz", rev = "ccc0057" }
-mpz-garble = { git = "https://github.com/privacy-scaling-explorations/mpz", rev = "ccc0057" }
-mpz-garble-core = { git = "https://github.com/privacy-scaling-explorations/mpz", rev = "ccc0057" }
-mpz-ole = { git = "https://github.com/privacy-scaling-explorations/mpz", rev = "ccc0057" }
-mpz-ot = { git = "https://github.com/privacy-scaling-explorations/mpz", rev = "ccc0057" }
-mpz-share-conversion = { git = "https://github.com/privacy-scaling-explorations/mpz", rev = "ccc0057" }
-mpz-fields = { git = "https://github.com/privacy-scaling-explorations/mpz", rev = "ccc0057" }
-mpz-zk = { git = "https://github.com/privacy-scaling-explorations/mpz", rev = "ccc0057" }
-mpz-hash = { git = "https://github.com/privacy-scaling-explorations/mpz", rev = "ccc0057" }
+mpz-circuits = { git = "https://github.com/rubydusa/mpz", branch = "ccc0057-patch-13-9-25" }
+mpz-memory-core = { git = "https://github.com/rubydusa/mpz", branch = "ccc0057-patch-13-9-25" }
+mpz-common = { git = "https://github.com/rubydusa/mpz", branch = "ccc0057-patch-13-9-25", features = ["force-st"] }
+mpz-core = { git = "https://github.com/rubydusa/mpz", branch = "ccc0057-patch-13-9-25" }
+mpz-vm-core = { git = "https://github.com/rubydusa/mpz", branch = "ccc0057-patch-13-9-25" }
+mpz-garble = { git = "https://github.com/rubydusa/mpz", branch = "ccc0057-patch-13-9-25" }
+mpz-garble-core = { git = "https://github.com/rubydusa/mpz", branch = "ccc0057-patch-13-9-25" }
+mpz-ole = { git = "https://github.com/rubydusa/mpz", branch = "ccc0057-patch-13-9-25" }
+mpz-ot = { git = "https://github.com/rubydusa/mpz", branch = "ccc0057-patch-13-9-25" }
+mpz-share-conversion = { git = "https://github.com/rubydusa/mpz", branch = "ccc0057-patch-13-9-25" }
+mpz-fields = { git = "https://github.com/rubydusa/mpz", branch = "ccc0057-patch-13-9-25" }
+mpz-zk = { git = "https://github.com/rubydusa/mpz", branch = "ccc0057-patch-13-9-25" }
+mpz-hash = { git = "https://github.com/rubydusa/mpz", branch = "ccc0057-patch-13-9-25" }
 
 rangeset = { version = "0.2" }
 serio = { version = "0.2" }
