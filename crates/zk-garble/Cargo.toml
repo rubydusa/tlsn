@@ -1,0 +1,30 @@
+[package]
+name = "tlsn-zk-garble"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Experimental: publicly verifiable proof-of-garbling (Binius64 SNARK) as a DEAP alternative."
+
+# This crate is intentionally EXCLUDED from the root workspace (see the root
+# Cargo.toml `exclude` list). binius64 is a large, fast-moving research
+# dependency; isolating it keeps the core workspace build and the `devloop`
+# fast. Build it from this directory: `cargo build` (or `cargo run --example ...`).
+#
+# For benchmarking, binius64 wants a native, LTO'd build:
+#   RUSTFLAGS="-C target-cpu=native" cargo build --release
+
+[dependencies]
+# Binius64 — transparent, post-quantum, public-coin zk-SNARK over binary tower
+# fields. Pinned to a specific commit for reproducibility.
+binius-frontend = { git = "https://github.com/binius-zk/binius64.git", rev = "7150b6e63ef771685f25e55eaa3b4628576e8981" }
+binius-prover = { git = "https://github.com/binius-zk/binius64.git", rev = "7150b6e63ef771685f25e55eaa3b4628576e8981" }
+binius-verifier = { git = "https://github.com/binius-zk/binius64.git", rev = "7150b6e63ef771685f25e55eaa3b4628576e8981" }
+binius-field = { git = "https://github.com/binius-zk/binius64.git", rev = "7150b6e63ef771685f25e55eaa3b4628576e8981" }
+binius-transcript = { git = "https://github.com/binius-zk/binius64.git", rev = "7150b6e63ef771685f25e55eaa3b4628576e8981" }
+
+# mpz garbling internals, via the local submodule so this crate sees your edits.
+mpz-garble-core = { path = "../../mpz/crates/garble-core" }
+mpz-circuits = { path = "../../mpz/crates/circuits", features = ["aes"] }
+mpz-core = { path = "../../mpz/crates/core" }
+
+anyhow = "1.0"

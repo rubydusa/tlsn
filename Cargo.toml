@@ -30,7 +30,7 @@ members = [
 # from its own directory.
 # `mpz` is a git submodule with its own Cargo workspace; exclude it so this
 # workspace does not absorb its crates (they are consumed as path dependencies).
-exclude = ["crates/examples-zk", "mpz"]
+exclude = ["crates/examples-zk", "mpz", "crates/zk-garble"]
 resolver = "2"
 
 [workspace.lints.rust]
