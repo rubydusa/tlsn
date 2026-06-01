@@ -40,6 +40,10 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 [[example]]
+name = "devloop"
+path = "devloop/devloop.rs"
+
+[[example]]
 name = "basic"
 path = "basic/basic.rs"
 

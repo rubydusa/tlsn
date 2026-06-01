@@ -28,7 +28,9 @@ members = [
 # git. Cargo would clone ~1 GB during dependency resolution for any build in
 # this workspace, even when the ZK example is not built. Users run that example
 # from its own directory.
-exclude = ["crates/examples-zk"]
+# `mpz` is a git submodule with its own Cargo workspace; exclude it so this
+# workspace does not absorb its crates (they are consumed as path dependencies).
+exclude = ["crates/examples-zk", "mpz"]
 resolver = "2"
 
 [workspace.lints.rust]
@@ -71,21 +73,26 @@ tlsn-sdk-core = { path = "crates/sdk-core" }
 tlsn-wasm = { path = "crates/wasm" }
 tlsn = { path = "crates/tlsn" }
 
-mpz-circuits = { git = "https://github.com/privacy-ethereum/mpz", rev = "v0.1.0-alpha.6" }
-mpz-circuits-data = { git = "https://github.com/privacy-ethereum/mpz", rev = "v0.1.0-alpha.6" }
-mpz-memory-core = { git = "https://github.com/privacy-ethereum/mpz", rev = "v0.1.0-alpha.6" }
-mpz-common = { git = "https://github.com/privacy-ethereum/mpz", rev = "v0.1.0-alpha.6" }
-mpz-core = { git = "https://github.com/privacy-ethereum/mpz", rev = "v0.1.0-alpha.6" }
-mpz-vm-core = { git = "https://github.com/privacy-ethereum/mpz", rev = "v0.1.0-alpha.6" }
-mpz-garble = { git = "https://github.com/privacy-ethereum/mpz", rev = "v0.1.0-alpha.6" }
-mpz-garble-core = { git = "https://github.com/privacy-ethereum/mpz", rev = "v0.1.0-alpha.6" }
-mpz-ole = { git = "https://github.com/privacy-ethereum/mpz", rev = "v0.1.0-alpha.6" }
-mpz-ot = { git = "https://github.com/privacy-ethereum/mpz", rev = "v0.1.0-alpha.6" }
-mpz-share-conversion = { git = "https://github.com/privacy-ethereum/mpz", rev = "v0.1.0-alpha.6" }
-mpz-fields = { git = "https://github.com/privacy-ethereum/mpz", rev = "v0.1.0-alpha.6" }
-mpz-zk = { git = "https://github.com/privacy-ethereum/mpz", rev = "v0.1.0-alpha.6" }
-mpz-hash = { git = "https://github.com/privacy-ethereum/mpz", rev = "v0.1.0-alpha.6", default-features = false }
-mpz-ideal-vm = { git = "https://github.com/privacy-ethereum/mpz", rev = "v0.1.0-alpha.6" }
+# mpz is vendored as a git submodule at `./mpz`, pinned to v0.1.0-alpha.6
+# (commit 6ebfe61). These are path dependencies so local edits to the submodule
+# are picked up directly. To revert to the upstream crates, restore the
+# `git = "...", rev = "v0.1.0-alpha.6"` form of these lines and run
+# `git submodule deinit -f mpz && git rm -f mpz`.
+mpz-circuits = { path = "mpz/crates/circuits" }
+mpz-circuits-data = { path = "mpz/crates/circuits-data" }
+mpz-memory-core = { path = "mpz/crates/memory-core" }
+mpz-common = { path = "mpz/crates/common" }
+mpz-core = { path = "mpz/crates/core" }
+mpz-vm-core = { path = "mpz/crates/vm-core" }
+mpz-garble = { path = "mpz/crates/garble" }
+mpz-garble-core = { path = "mpz/crates/garble-core" }
+mpz-ole = { path = "mpz/crates/ole" }
+mpz-ot = { path = "mpz/crates/ot" }
+mpz-share-conversion = { path = "mpz/crates/share-conversion" }
+mpz-fields = { path = "mpz/crates/fields" }
+mpz-zk = { path = "mpz/crates/zk" }
+mpz-hash = { path = "mpz/crates/hash", default-features = false }
+mpz-ideal-vm = { path = "mpz/crates/ideal-vm" }
 
 futures-plex = { git = "https://github.com/tlsnotary/tlsn-utils", rev = "64722f7" }
 rangeset = { version = "0.4" }

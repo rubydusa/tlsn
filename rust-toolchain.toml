@@ -1,0 +1,5 @@
+# Pins the workspace toolchain to the version CI builds with
+# (see `RUST_VERSION` in .github/workflows/ci.yml). mpz requires rustc >= 1.95.
+# The wasm crate overrides this with its own nightly `rust-toolchain` file.
+[toolchain]
+channel = "1.96.0"
