@@ -116,6 +116,18 @@ sender commitment is the public input to the proof.
    the SNARK: ~`4·and_count` AES evaluations. AES-128 ≈ 6k AND gates/block, and
    a transcript is many blocks → large. It is offline (preprocess), but
    estimate constraint counts early on a small `C` before scaling.
+   **Measured (milestone 1):** one `tccr` = 180,816 binius64 AND-constraints, so
+   a garbled AND gate (4 hashes) ≈ 723k, and a circuit with `and_count` AND gates
+   ≈ `4·and_count·180k`. AES-128 alone (~6.4k AND gates) ⇒ ~4.6×10⁹ constraints
+   — infeasible to prove naively (Binius practical range is ~2²⁸). Two levers:
+   (a) ✅ **done** — the S-box now supplies `x⁻¹` via binius's `Hint` mechanism,
+   verified in 3 GF-muls (not 13): **measured 3.3×, one `tccr` 180,816 → 54,096
+   AND-constraints** (short of the loose "10×" because MixColumns/affine GF-muls
+   are untouched; a dedicated `xtime` for MixColumns would shave more). Still
+   ~1.4×10⁹ for one AES block's garbling, so (b) the real lever: since mpz is
+   forked, **co-design the garbling hash** — swap fixed-key AES for a binary-field
+   / SNARK-friendly permutation so per-gate proof cost collapses. See
+   `HASH_CODESIGN.md`.
 2. **On-chain verification.** Binius/FRI-Brakedown proofs are **large
    (tens–hundreds of KB) and hash-heavy to verify** — *publicly verifiable* but
    NOT cheap to verify directly in a smart contract. For a ledger, plan for
@@ -155,8 +167,11 @@ sender commitment is the public input to the proof.
 
 ## 9. Milestones
 
-1. Model one fixed-key-AES (TCCR) call in `binius_frontend`; test vs
-   `mpz_core::aes`.
+1. ✅ **Done.** Fixed-key-AES TCCR modeled in `binius_frontend` (`src/aes.rs`),
+   bit-exact vs `mpz_core::aes` (S-box, full AES-128 `π`, and `tccr` all tested).
+   **Cost: one `tccr` = 54,096 AND-constraints after the hint optimization in §7
+   (was 180,816 with a direct `x²⁵⁴` S-box); ~216k per garbled AND gate.** Still
+   does NOT scale to a full session — see §7.
 2. Prove one garbled AND gate (the §2 equations); test vs `garble-core::and_gate`.
 3. Propagate labels through a whole `mpz_circuits::Circuit`; prove a small `C`
    (e.g. one AES block); measure constraints/proof size/prover time.
