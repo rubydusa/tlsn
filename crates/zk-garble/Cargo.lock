@@ -1705,6 +1705,7 @@ name = "tlsn-zk-garble"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "binius-core",
  "binius-field",
  "binius-frontend",
  "binius-prover",

@@ -20,6 +20,8 @@
 //! integration compiles; the constraint system itself is TODO.
 #![allow(unused)]
 
+pub mod aes;
+
 use binius_frontend::{Circuit as ProofCircuit, CircuitBuilder, Wire};
 use mpz_circuits::Circuit as GarbledFn;
 use mpz_garble_core::{Delta, Key};

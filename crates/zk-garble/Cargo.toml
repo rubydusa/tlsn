@@ -17,6 +17,7 @@ description = "Experimental: publicly verifiable proof-of-garbling (Binius64 SNA
 # Binius64 — transparent, post-quantum, public-coin zk-SNARK over binary tower
 # fields. Pinned to a specific commit for reproducibility.
 binius-frontend = { git = "https://github.com/binius-zk/binius64.git", rev = "7150b6e63ef771685f25e55eaa3b4628576e8981" }
+binius-core = { git = "https://github.com/binius-zk/binius64.git", rev = "7150b6e63ef771685f25e55eaa3b4628576e8981" }
 binius-prover = { git = "https://github.com/binius-zk/binius64.git", rev = "7150b6e63ef771685f25e55eaa3b4628576e8981" }
 binius-verifier = { git = "https://github.com/binius-zk/binius64.git", rev = "7150b6e63ef771685f25e55eaa3b4628576e8981" }
 binius-field = { git = "https://github.com/binius-zk/binius64.git", rev = "7150b6e63ef771685f25e55eaa3b4628576e8981" }
