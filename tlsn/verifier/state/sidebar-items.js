@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["CommitAccepted","CommitStart","Committed","Initialized","Verify"],"trait":["VerifierState"]};
