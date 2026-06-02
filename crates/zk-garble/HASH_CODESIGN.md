@@ -13,6 +13,38 @@ AES-in-SNARK further (a dedicated `xtime`, cheaper affine) buys maybe ~1.5× mor
 and then stops. The cost is *fundamentally* "prove a fixed-key AES per gate". The
 only order-of-magnitude lever is to stop using AES as the garbling hash.
 
+## Milestone 1 result (measured, `src/bf.rs`)
+
+binius64's word frontend has no native GF(2ᵏ) multiply, so I measured what one
+costs when built from word ops:
+
+| variable field-mul              | AND-constraints |
+|---------------------------------|-----------------|
+| GF(2⁸)  (AES's field)           | 41              |
+| GF(2³²) (Vision Mark-32)        | 164             |
+| GF(2⁶⁴) (= one binius64 word)   | 262             |
+
+(vs **~1** for a *native* field-mul constraint in the original Binius.) A Vision
+permutation's MDS and squarings are GF(2)-*linear* (mult-by-constant / Frobenius)
+and cheap; its real cost is the S-box **inversions** — one variable field-mul each
+(via hint) × *hundreds* of S-boxes ≈ ~10⁵ AND-constraints. That is **comparable to
+a few× worse than the 54,096-AND AES `tccr` — and certainly not the ≥10× *better*
+we need.** (An earlier draft said "~17× worse"; that wrongly modeled the MDS as
+variable muls — corrected.) **Decision gate: FAIL for binius64.**
+
+Root cause — and the subtle part: "SNARK over binary tower fields" describes where
+the *commitment/prover* lives, not the *constraint system*. binius64's constraint
+system (`binius-core` `constraint_system.rs`) has exactly two types: `AndConstraint`
+(bitwise `A&B=C`, free XOR/shift combos) and `MulConstraint` (64-bit **integer**
+mul). There is **no GF(2ᵏ) field-multiply constraint** — so a carryless field mul
+must be synthesized from ~one AND per bit (cost grows with field size: 41→164→262).
+Vision is cheap in the *original* Binius (AIR over native GF(2ᵏ), field-mul ≈ 1
+constraint); binius64 traded that for a CPU-friendly word machine where the cost
+unit is the bitwise AND. AES is already competitive *because* it uses the tiny
+GF(2⁸); larger-field algebraic hashes cost more per mul here, the opposite of their
+advantage under native-field arithmetization. The right metric is **AND-gate
+count**, which redirects the candidate list below.
+
 ## The binding constraint: what we may swap
 
 Half-gates + free-XOR security rests on the garbling hash being a **circular
@@ -27,23 +59,29 @@ function is.** We keep the half-gate equations and the free-XOR Δ structure
 (or admit) a CCR security argument in the mode we use it — this is the real
 research risk, not the engineering.
 
-## Candidates (binary-field, cheap to prove in Binius64)
+## Candidates — redirected by the measurement
 
-1. **Vision Mark-32** — Irreducible + 3MI Labs, "ZK-Friendly Hash over Binary
-   Tower Fields" (eprint 2024/633). Arithmetization-oriented, *designed* to be
-   cheap in Binius. `binius-hash` already ships the Vision permutation
-   (`vision_4`, `vision_6`) as a native impl. **Primary candidate.** Its S-box is
-   a power map / inversion over GF(2³²) — so the **same hint trick we just used
-   for AES transfers** (supply the inverse, verify with one field mul), keeping
-   the in-circuit cost low. Caveat: Vision Mark-32 is analyzed as a *sponge hash*,
-   not as a TCCR dual-key cipher; using its permutation in an MMO/TMMO-style TCCR
-   mode needs a security argument (milestone 2).
-2. **Poseidon2b** — binary-field Poseidon/Poseidon2 (eprint 2025/1893). Alternate
-   AO permutation over binary fields if Vision's TCCR mode is awkward.
-3. **Low-multiplicative-complexity ciphers (LowMC, eprint 2016/687)** — a 3-bit
-   quadratic S-box minimizes AND count, so cheap to *garble* and to *prove*.
-   But LowMC has substantial cryptanalysis (algebraic / low-data attacks) — only
-   with conservative parameters, and probably not worth the risk vs Vision.
+The word machine charges ~1 constraint per bitwise AND, so proving "I computed
+hash `H`" costs ≈ `H`'s **AND-gate count**. Minimize that.
+
+1. **Low-AND-count primitives (LowMC, eprint 2016/687; Rasta/Dasta family).**
+   Built for minimal multiplicative (AND) complexity — hundreds of AND gates — so
+   cheap to *prove* in binius64 *and* cheap to *garble* (small garbled circuit):
+   a double win, since both costs scale with AND count. **New primary direction.**
+   Risk: LowMC has real cryptanalysis (algebraic / low-data attacks) — use
+   conservative parameters, or a purpose-built low-AND correlation-robust hash.
+2. **Bitsliced AES, not arithmetic AES (a free baseline win).** Our current gadget
+   builds the S-box from GF(2⁸) inversion (~27k AND per AES). The *Boolean /
+   bitsliced* AES-128 — literally the circuit that gets garbled, S-box ≈ 32 AND
+   (Boyar–Peralta) — is ~6.4k AND gates ⇒ ~6.4k AND-constraints, ~4× cheaper than
+   our arithmetic gadget and aligned with the garbled circuit. Worth doing
+   regardless of the primitive choice.
+3. **Vision / Poseidon2b — only if switching proof systems.** Algebraic
+   binary-field hashes (eprint 2024/633, 2025/1893) are cheap in the *original*
+   Binius (native GF(2ᵏ)), not the binius64 word machine. Strategic fork: stay on
+   binius64 (fast CPU) with a low-AND hash, **or** move to Binius (AIR, native
+   GF(2ᵏ)) where Vision Mark-32 is ~1 constraint/mul. This is a proof-system
+   decision, not a hash decision.
 
 ## The tradeoff to quantify
 
@@ -66,14 +104,14 @@ garbling slowdown is a clear win; confirm the actual ratio.
 
 ## Milestones
 
-1. **In-circuit cost of the candidate.** Get a `binius_frontend` gadget for the
-   Vision permutation (binius-hash has the native impl; check `binius-circuits`
-   for a frontend gadget, else build one — S-box = inversion ⇒ hint-friendly).
-   Measure AND-constraints for one TCCR-equivalent evaluation and compare to
-   **54,096** (AES). Decision gate: target ≥10× cheaper.
-2. **TCCR mode + security.** Define the permutation→TCCR construction (MMO/TMMO),
-   state the CCR assumption, and check Vision Mark-32's analysis covers — or can
-   be extended to — this mode. This is the gating *research* question.
+1. ✅ **Done — Vision FAILS the gate (`src/bf.rs`).** GF(2³²) mul = 164 AND ⇒ a
+   Vision permutation ≈ 10⁵–10⁶ AND (3–17× worse than AES); see "Milestone 1
+   result". **Next:** pick a low-AND CR hash for binius64 (LowMC-family or
+   purpose-built) and measure one evaluation vs 54,096 — *or* take the
+   proof-system fork (original Binius for Vision). Cheap interim win: build the
+   bitsliced-AES gadget (~6.4k AND) to replace the arithmetic one.
+2. **TCCR mode + security.** Define the permutation→TCCR construction (MMO/TMMO)
+   and the CCR argument for the chosen primitive — the gating *research* question.
 3. **mpz integration.** Add the `GarbleHash` trait + candidate impl in garble-core
    behind a config; keep `test_mpc` green with the new hash end-to-end.
 4. **End-to-end measurement.** Native garbling time + proof size/time for a small

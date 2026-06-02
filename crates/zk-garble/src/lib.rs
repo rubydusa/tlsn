@@ -21,6 +21,7 @@
 #![allow(unused)]
 
 pub mod aes;
+pub mod bf;
 
 use binius_frontend::{Circuit as ProofCircuit, CircuitBuilder, Wire};
 use mpz_circuits::Circuit as GarbledFn;
