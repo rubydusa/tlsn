@@ -83,6 +83,54 @@ hash `H`" costs ≈ `H`'s **AND-gate count**. Minimize that.
    GF(2ᵏ)) where Vision Mark-32 is ~1 constraint/mul. This is a proof-system
    decision, not a hash decision.
 
+## Milestone result: LowMC measured (`src/lowmc.rs`)
+
+Built candidate 1 — a fixed-key LowMC permutation (Picnic-L1: `n=128`, `m=10`
+S-boxes/round, `r=20`; multiplicative complexity `3·m·r = 600`) — as a binius64
+gadget, bit-exact against a clean-room reference, and measured its `tccr` (two
+permutations, the analog of `aes::tccr`) against the 54,096-AND fixed-key-AES
+baseline. **Verdict: PASS — LowMC clears the ≥10× gate, the opposite of Vision.**
+
+| garbling hash                          | one `tccr`, AND-constraints | vs AES `tccr` |
+|----------------------------------------|-----------------------------|---------------|
+| fixed-key AES (baseline, DESIGN.md §7) | 54,096                      | 1×            |
+| LowMC, compilable (`commit_every=2`)   | 5,241                       | **10.3×**     |
+| LowMC, S-box floor (`3·m·r` only)      | ~1,200                      | **~45×**      |
+
+Downstream: a garbled AND gate hashes 4×, so per-gate proof cost falls from
+≈216k to ≈21k AND-constraints, and one AES-128 block's garbling (~6.4k AND gates)
+needs ≈1.3×10⁸ ≈ 2²⁷ constraints — *inside* Binius's ~2²⁸ practical range, where
+AES-as-hash sat at ≈1.4×10⁹ ≈ 2³⁰·⁴ (5× over). **LowMC turns proving a single
+block's garbling from infeasible into feasible** (≈2²⁵ at the floor).
+
+Two honest qualifiers on the number:
+
+1. **The 10.3× is frontend-limited, not fundamental.** LowMC's only *hard* ANDs
+   are the S-box products: 600/permutation (the `3·m·r` floor, ~45×). The rest is
+   materializing the dense GF(2)-linear layers — *free* in binius64's constraint
+   system (an AND operand may be any XOR-combination of wires), but the
+   gate-fusion inliner flattens the composed 20-round linear map without sharing:
+   exponential (≈156 s to compile at `r=4`, OOM at `r=20`). We bound it by
+   `force_commit`-ing the 128 state bits every `commit_every` rounds (~`N` ANDs
+   each), which moves the cost 7.6× (every round) → 10.3× (every other) and would
+   approach the 45× floor with a smarter commit policy, structured/sparser linear
+   layers, or a frontend that keeps linear maps factored. The S-box count already
+   proves the order-of-magnitude headroom.
+2. **Cost is matrix-independent; security is now the gate.** The clean-room
+   pseudo-random matrices give the same AND-count as the spec's Grain-LFSR ones,
+   so the open question is purely cryptographic: LowMC's low multiplicative
+   complexity is exactly what its dedicated cryptanalysis targets (algebraic /
+   interpolation / difference-enumeration — Dinur et al. 2021; use conservative
+   rounds), and half-gates needs a *circular correlation-robust* hash, which a PRP
+   claim does not give. A CCR/TCCR mode for a low-AND permutation is milestone 2,
+   and now the critical path.
+
+Op-cost model behind these numbers (`op_cost_probes`): in binius64 each `band` is
+1 AND constraint — constants are **not** folded, so `band(x, const)` still costs 1
+— while `bxor`/`shl`/`sar` fuse into the consuming gate for ~0. So proof cost ≈
+AND-gate count, as the redirect predicted; but "linear is free" holds only where
+the inliner can absorb it, which deep dense linear layers defeat.
+
 ## The tradeoff to quantify
 
 Fixed-key AES is ~1 ns/call via AES-NI, so mpz garbles fast *natively*; algebraic
@@ -104,14 +152,17 @@ garbling slowdown is a clear win; confirm the actual ratio.
 
 ## Milestones
 
-1. ✅ **Done — Vision FAILS the gate (`src/bf.rs`).** GF(2³²) mul = 164 AND ⇒ a
-   Vision permutation ≈ 10⁵–10⁶ AND (3–17× worse than AES); see "Milestone 1
-   result". **Next:** pick a low-AND CR hash for binius64 (LowMC-family or
-   purpose-built) and measure one evaluation vs 54,096 — *or* take the
-   proof-system fork (original Binius for Vision). Cheap interim win: build the
-   bitsliced-AES gadget (~6.4k AND) to replace the arithmetic one.
+1. ✅ **Done — Vision FAILS, LowMC PASSES.** Vision: GF(2³²) mul = 164 AND ⇒ a
+   permutation ≈ 10⁵–10⁶ AND (`src/bf.rs`). LowMC: one `tccr` = **5,241 AND ⇒
+   10.3×** vs AES's 54,096, S-box floor ~45× (`src/lowmc.rs`; see "Milestone
+   result: LowMC measured"). **Next:** milestone 2 — a CCR/TCCR argument and mode
+   for a low-AND permutation (the gating *research* question) — alongside closing
+   the frontend gap toward the 45× floor (commit policy / structured linear
+   layers). Cheap interim win still on the table: the bitsliced-AES gadget (~6.4k
+   AND).
 2. **TCCR mode + security.** Define the permutation→TCCR construction (MMO/TMMO)
    and the CCR argument for the chosen primitive — the gating *research* question.
+   With LowMC measured, this is the critical path, not the proof-cost.
 3. **mpz integration.** Add the `GarbleHash` trait + candidate impl in garble-core
    behind a config; keep `test_mpc` green with the new hash end-to-end.
 4. **End-to-end measurement.** Native garbling time + proof size/time for a small
