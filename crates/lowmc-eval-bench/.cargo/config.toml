@@ -1,0 +1,5 @@
+# AVX-512 (the kernel uses _mm512_* intrinsics for the bitsliced linear layer).
+# Scoped to this directory: cargo only reads .cargo/config.toml from the cwd and
+# its ancestors, never descendants, so this does not affect the parent workspace.
+[build]
+rustflags = ["-C", "target-cpu=native"]

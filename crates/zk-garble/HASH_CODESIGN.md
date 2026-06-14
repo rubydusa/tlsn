@@ -140,6 +140,46 @@ natively but orders of magnitude cheaper to *prove*. Garbling is offline
 cost is the right direction — but measure both. A 100× proof win at a 10× native
 garbling slowdown is a clear win; confirm the actual ratio.
 
+## Online evaluation cost measured (`crates/lowmc-eval-bench`)
+
+The proof-cost win above is offline; so is garbling. The one LowMC cost that runs
+*live during the TLS session* — and is therefore bounded by the server's read
+timeout — is **evaluation**: the circuit evaluator computes 2 `tccr` = **4 LowMC
+permutations per garbled AND gate** as it streams the session. Swapping AES-NI (a
+few ns/call in hardware) for LowMC (no hardware path) is a real online slowdown, so
+the question is not "is it cheaper" but "does it still fit the timeout". Measured in
+`crates/lowmc-eval-bench` (bitsliced LowMC-128/128/20, frequency-invariant
+cycles/block via `perf`, i7-1165G7):
+
+| evaluation kernel                          | cyc / perm | 4 KB session (≈10.4M perms)        |
+|--------------------------------------------|------------|-------------------------------------|
+| AES-NI `tccr` (for reference)              | ~6         | ~17 ms                              |
+| LowMC bitsliced — compact gather (`v1`)    | ~1,200     | ~3.4 s                              |
+| LowMC bitsliced — **AVX-512 (`tight_b`)**  | **~730**   | **~1.9 s @ 4 GHz / ~2.7 s @ 2.8 GHz** |
+
+(4 KB session ≈ 2.6M AND gates ⇒ ×4 perms/gate ≈ 10.4M evaluation-permutations;
+the gate count is an estimate.) **Verdict: LowMC evaluation stays ~120× AES in
+cycles but lands at ~2 s/session — inside typical TLS read timeouts, with margin.**
+LowMC's proof-cost win therefore does *not* buy an un-evaluable online circuit.
+
+Engineering notes (the bench documents the path):
+
+- **Explicit AVX-512 + unchecked CSR gather is the win** (~730 cyc, instructions
+  halved vs the autovectorized baseline) — the autovectorizer leaves the `zmm`
+  XOR-accumulate on the table, so it must be written by hand.
+- **Fully unrolling the fixed matrices into straight-line code ("matrix codegen")
+  is a 13× *regression*** (~9,900 cyc/perm, IPC 0.45). Bitslicing already amortizes
+  the per-set-bit bookkeeping across 512 blocks, so the per-block budget is tiny and
+  the megabytes of unrolled code starve the instruction front-end. The compact loop
+  hot in L1I is *why* the kernel is fast — do not unroll it.
+- Multiple accumulators lift IPC but trade it back in instructions: the kernel
+  plateaus at ~730, load/throughput bound, ~2.3× above the ~320 cyc/perm floor (the
+  residual gap is gather indirection, hard to close without the cache-blowing unroll).
+
+Caveat: this is the *fixed-key permutation* eval cost. The eventual TCCR mode
+(milestone 2) wraps the permutation (MMO/TMMO ≈ 1–2 perms + a few XORs), so the
+per-`tccr` online cost tracks this number; re-measure once the mode is fixed.
+
 ## Integration in the forked mpz
 
 - The hash is called in `mpz/crates/garble-core/src/garbler.rs::and_gate` (and
@@ -166,7 +206,9 @@ garbling slowdown is a clear win; confirm the actual ratio.
 3. **mpz integration.** Add the `GarbleHash` trait + candidate impl in garble-core
    behind a config; keep `test_mpc` green with the new hash end-to-end.
 4. **End-to-end measurement.** Native garbling time + proof size/time for a small
-   `C`, vs the AES baseline.
+   `C`, vs the AES baseline. (Online *evaluation* cost — the timeout-bound one — is
+   already measured: `crates/lowmc-eval-bench`, ~730 cyc/perm ⇒ ~2 s per 4 KB
+   session; see "Online evaluation cost measured".)
 5. **Proof circuit.** Re-target `build_proof_of_garbling` at the new hash; per-gate
    cost should now make a full-session proof tractable.
 

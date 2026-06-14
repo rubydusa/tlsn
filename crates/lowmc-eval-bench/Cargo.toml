@@ -1,0 +1,17 @@
+[package]
+name = "lowmc-eval-bench"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Standalone microbenchmark for the ONLINE EVALUATION cost of a LowMC-as-garbling-
+# hash circuit (see ../zk-garble/HASH_CODESIGN.md). Intentionally excluded from the
+# workspace: `perf-event` is Linux-only and would break macOS/Windows builds, and
+# the kernel needs `-C target-cpu=native` (AVX-512) — both unfit for the main build/CI.
+
+[dependencies]
+perf-event = "0.4"
+
+[profile.release]
+opt-level = 3
+codegen-units = 1

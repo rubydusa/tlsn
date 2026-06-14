@@ -30,7 +30,10 @@ members = [
 # from its own directory.
 # `mpz` is a git submodule with its own Cargo workspace; exclude it so this
 # workspace does not absorb its crates (they are consumed as path dependencies).
-exclude = ["crates/examples-zk", "mpz", "crates/zk-garble"]
+# `crates/lowmc-eval-bench` is a standalone microbenchmark depending on the
+# Linux-only `perf-event` and requiring `-C target-cpu=native` (AVX-512); both
+# would break portable workspace builds/CI, so it is run from its own directory.
+exclude = ["crates/examples-zk", "mpz", "crates/zk-garble", "crates/lowmc-eval-bench"]
 resolver = "2"
 
 [workspace.lints.rust]
